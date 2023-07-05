@@ -61,8 +61,8 @@ validation_dataset = FNOData(u[train_size:train_size + validation_size], f[train
 test_dataset = FNOData(u[train_size + validation_size:], f[train_size + validation_size:])
 
 # ----------------------------- Normalize the data --------------------------------- #
-Normalize_input = False
-Normalize_output = False
+Normalize_input = True
+Normalize_output = True
 # Calculate mean and standard deviation of the training set
 u_train_mean = train_dataset.u.mean()
 u_train_std = train_dataset.u.std()
@@ -94,7 +94,7 @@ if Normalize_output:
     # test_dataset.f = (test_dataset.f - f_train_mean) / f_train_std
 
 # ----------------------------- Create a dataloader -----------------------------
-train_dataloader = torch.utils.data.DataLoader(dataset, batch_size=200, shuffle=True)
+train_dataloader = torch.utils.data.DataLoader(dataset, batch_size=20, shuffle=True)
 validation_dataloader = torch.utils.data.DataLoader(validation_dataset, batch_size=50, shuffle=False)
 test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=50, shuffle=False)
 
@@ -272,11 +272,11 @@ device = 'cuda'  #change to cpu of no cuda available
 
 #Model parameters
 modes = 36 # number of Fourier modes to multiply
-width = 1 # input and output channels to the FNO layer
+width = 64 # input and output channels to the FNO layer
 
-num_epochs = 30 #set to one so faster computation, in principle 20 is best
+num_epochs = 50 #set to one so faster computation, in principle 20 is best
 # learning_rate = 0.0001
-learning_rate = 1e-5
+learning_rate = 1e-4
 lr_decay = 0.4
 num_workers = 0
 
@@ -312,7 +312,8 @@ for epoch in range(num_epochs):
         labels_train = labels_train.to(device=device, dtype = torch.float32)
 
         # Forward pass train
-        model_output = directstep(mynet,inputs_train)
+        # model_output = directstep(mynet,inputs_train)
+        model_output = mynet(inputs_train)
         train_loss = loss(model_output,labels_train)
         train_r2 = r2_score(labels_train,model_output)
         
