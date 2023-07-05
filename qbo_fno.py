@@ -272,17 +272,17 @@ device = 'cuda'  #change to cpu of no cuda available
 
 #Model parameters
 modes = 36 # number of Fourier modes to multiply
-width = 30 # input and output channels to the FNO layer
+width = 1 # input and output channels to the FNO layer
 
 num_epochs = 30 #set to one so faster computation, in principle 20 is best
-learning_rate = 0.0001
+# learning_rate = 0.0001
+learning_rate = 1e-5
 lr_decay = 0.4
 num_workers = 0
 
 mynet = FNO1d(modes, width, time_future, time_history).cuda()
 count_parameters(mynet)
 mynet.cuda()
-epochs = 60
 
 loss = nn.MSELoss()
 #use two optimizers.  learing rates seem to work.
