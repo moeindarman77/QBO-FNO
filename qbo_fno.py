@@ -11,7 +11,7 @@ data = u_250 # Change the mode to 36 when you set the data to u_500
 # Remove the last row and column from u
 u = data['u'][:-1, 1:-1]
 # Remove the first row and column from f
-f = data['f'][1:, 1:-1]
+f = data['f'][1:, 1:-1]*100000
 
 # ------------------- Plot the data ------------------- #
 def r2_score(output, target):
@@ -61,8 +61,8 @@ validation_dataset = FNOData(u[train_size:train_size + validation_size], f[train
 test_dataset = FNOData(u[train_size + validation_size:], f[train_size + validation_size:])
 
 # ----------------------------- Normalize the data --------------------------------- #
-Normalize_input = True
-Normalize_output = True
+Normalize_input = False
+Normalize_output = False
 # Calculate mean and standard deviation of the training set
 u_train_mean = train_dataset.u.mean()
 u_train_std = train_dataset.u.std()
@@ -141,7 +141,6 @@ def directstep(net,input_batch):
   return output_1
 
 # -------------------------------------------- FNO architecture -------------------------------------------- #
-
 ################################################################
 #  1d Fourier Integral Operator
 ################################################################
@@ -274,8 +273,7 @@ device = 'cuda'  #change to cpu of no cuda available
 modes = 36 # number of Fourier modes to multiply
 width = 64 # input and output channels to the FNO layer
 
-num_epochs = 50 #set to one so faster computation, in principle 20 is best
-# learning_rate = 0.0001
+num_epochs = 10 #set to one so faster computation, in principle 20 is best
 learning_rate = 1e-4
 lr_decay = 0.4
 num_workers = 0
@@ -381,7 +379,6 @@ plot_loss(train_loss_list, test_loss_list, save_fig=True, fig_name='loss_history
 
 
 # -------------------------------------------- Inferenece on the validation data --------------------------------------------
-
 val_loss_total = 0
 val_r2_total = 0
 pred_val = []
@@ -419,7 +416,6 @@ with torch.no_grad():
 
 
 # -------------------------------------------- Saving OUTPUTS --------------------------------------------
-
 ## Save the predictions and the true labels in .nc format
 from netCDF4 import Dataset
 
@@ -447,3 +443,60 @@ true_var[:] = true_val
 
 rootgrp.close()
 
+# Do the inference on the training data (This for testing my code is working properly)
+pred_train = []
+true_train = []
+with torch.no_grad():
+    for i, data_train in enumerate(train_dataloader):
+        inputs_train, labels_train = data_train[0].unsqueeze(2), data_train[1].unsqueeze(2)
+        
+        # Move tensors to the configured device
+        inputs_train = inputs_train.to(device=device, dtype = torch.float32)
+        labels_train = labels_train.to(device=device, dtype = torch.float32)
+
+        # Forward pass test
+        model_output_train = directstep(mynet, inputs_train)
+        if Normalize_output:
+            # Denormalize the output
+            model_output_train = model_output_train * f_train_std + f_train_mean
+        train_loss = loss(model_output_train, labels_train)
+        train_r2 = r2_score(labels_train,model_output_train)
+
+        # Append the prediction and the true labels
+        pred_train.append(model_output_train.cpu().numpy())
+        true_train.append(labels_train.cpu().numpy())
+
+        # Sum the loss
+        train_loss_total += train_loss.item()
+        train_r2_total += train_r2.item()
+
+    # Average the loss
+    train_loss_avg = train_loss_total/len(train_dataloader)
+    train_r2_avg = train_r2_total/len(train_dataloader)
+    print('Train Loss: {:10.3e}'.format(train_loss_avg))
+    del inputs_train, labels_train, model_output_train
+
+# Save the predictions and the true labels
+
+pred_train = np.concatenate(pred_train, axis=0)
+true_train = np.concatenate(true_train, axis=0)
+
+print(pred_train.shape)
+print(true_train.shape)
+
+# Save in .nc format
+rootgrp = Dataset("pred_true_train.nc", "w", format="NETCDF4")
+
+# Create dimensions
+sample_dim = rootgrp.createDimension("sample", None)  # for unlimited dimension
+other_dim = rootgrp.createDimension("other", pred_train.shape[1])
+
+# Create variables
+pred_var = rootgrp.createVariable("pred_train","f4",("sample","other"))
+true_var = rootgrp.createVariable("true_train","f4",("sample","other"))
+
+# Assign data to variables
+pred_var[:] = pred_train
+true_var[:] = true_train
+
+rootgrp.close()
